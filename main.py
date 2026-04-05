@@ -6,17 +6,20 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from database import init_db
 from handlers import user, admin
 
-# Получаем токены из переменных окружения (для GitHub Actions)
+# Получаем токены из переменных окружения и убираем пробелы
 TOKEN = os.getenv("TOKEN")
 DEEPIKA_KEY = os.getenv("DEEPIKA_KEY")
 
+TOKEN = TOKEN.strip() if TOKEN else None
+DEEPIKA_KEY = DEEPIKA_KEY.strip() if DEEPIKA_KEY else None
+
 if not TOKEN:
-    raise ValueError("BOT TOKEN не найден. Установите переменную окружения TOKEN.")
+    raise ValueError("BOT TOKEN не найден или пустой! Проверьте GitHub Secrets.")
 if not DEEPIKA_KEY:
     print("Внимание: DEEPIKA_KEY не установлен. Нейросеть не будет работать.")
 
 async def main():
-    # Создаём бота и диспетчер
+    # Создание бота и диспетчера
     bot = Bot(token=TOKEN)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
@@ -30,7 +33,7 @@ async def main():
 
     print("Бот запущен и готов к работе!")
 
-    # Асинхронный запуск polling
+    # Запуск polling
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
