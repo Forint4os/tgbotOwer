@@ -8,6 +8,10 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    env:
+      TOKEN: ${{ secrets.BOT_TOKEN }}
+      DEEPIKA_KEY: ${{ secrets.DEEPIKA_KEY }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
     - name: Checkout code
@@ -22,7 +26,4 @@ jobs:
       run: pip install -r requirements.txt
 
     - name: Run bot
-      env:
-        TOKEN: ${{ secrets.BOT_TOKEN }}
-        DEEPIKA_KEY: ${{ secrets.DEEPIKA_KEY }}
       run: python main.py
