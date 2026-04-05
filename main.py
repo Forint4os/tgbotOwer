@@ -1,18 +1,28 @@
-from aiogram import Bot, Dispatcher, executor
+# main.py
+import asyncio
+from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from config import TOKEN
 from database import init_db
 from handlers import user, admin
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
+async def main():
+    # Создание бота и диспетчера
+    bot = Bot(token=TOKEN)
+    storage = MemoryStorage()
+    dp = Dispatcher(storage=storage)
 
-# Инициализация БД
-init_db()
+    # Инициализация базы данных
+    init_db()
 
-# Регистрация хендлеров
-dp.message.register(user.start_handler, commands=["start"])
-# Здесь нужно добавить регистрацию всех остальных хендлеров из user.py и admin.py
+    # Подключение роутеров
+    dp.include_router(user.router)
+    dp.include_router(admin.router)
+
+    print("Бот запущен и готов к работе!")
+
+    # Запуск polling
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())
