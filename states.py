@@ -1,5 +1,6 @@
-from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.state import State, StatesGroup
 
+# Для пользователя
 class UserStates(StatesGroup):
     choose_category = State()
     choose_receiver = State()
@@ -7,6 +8,7 @@ class UserStates(StatesGroup):
     write_message = State()
     confirm_send = State()
 
+# Для админа
 class AdminStates(StatesGroup):
     menu = State()
     filter_category = State()
