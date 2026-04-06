@@ -15,6 +15,7 @@ def is_admin(user_id):
 @router.message(Command("admin"))
 async def admin_panel(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
+        await message.answer("❌ У вас нет доступа к админ-панели.")
         return
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     kb.add(KeyboardButton("📩 Сообщения"), KeyboardButton("📊 Статистика"))
