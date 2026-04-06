@@ -1,17 +1,23 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from states import AdminStates
 from config import ADMINS, CATEGORIES
-from database import get_messages_for_admin, update_message_status
+from database import (
+    get_messages_for_admin,
+    get_messages_by_category,
+    get_message_by_id,
+    update_message_status,
+    get_stats
+)
 
 router = Router()
 
-# Проверка: админ ли
 def is_admin(user_id):
     return user_id in ADMINS.values()
 
-# Вход в админку
+# Главное меню
 @router.message(Command("admin"))
 async def admin_panel(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
@@ -19,81 +25,106 @@ async def admin_panel(message: types.Message, state: FSMContext):
 
     kb = types.ReplyKeyboardMarkup(
         keyboard=[
-            [types.KeyboardButton(text="📩 Мои сообщения")],
+            [types.KeyboardButton(text="📩 Сообщения")],
             [types.KeyboardButton(text="📊 Статистика")]
         ],
         resize_keyboard=True
     )
 
-    await message.answer("Админ панель:", reply_markup=kb)
+    await message.answer("⚙️ Админ панель:", reply_markup=kb)
     await state.set_state(AdminStates.menu)
 
-# Просмотр сообщений
-@router.message(AdminStates.menu, F.text == "📩 Мои сообщения")
-async def my_messages(message: types.Message, state: FSMContext):
-    msgs = get_messages_for_admin(message.from_user.id)
+# ================= СООБЩЕНИЯ =================
+
+@router.message(AdminStates.menu, F.text == "📩 Сообщения")
+async def choose_filter(message: types.Message, state: FSMContext):
+    kb = types.ReplyKeyboardMarkup(
+        keyboard=[[types.KeyboardButton(text=cat)] for cat in CATEGORIES] + [[types.KeyboardButton(text="📥 Все")]],
+        resize_keyboard=True
+    )
+    await message.answer("Выбери категорию:", reply_markup=kb)
+    await state.set_state(AdminStates.filter_category)
+
+# Фильтр
+@router.message(AdminStates.filter_category)
+async def show_messages(message: types.Message, state: FSMContext):
+    if message.text == "📥 Все":
+        msgs = get_messages_for_admin(message.from_user.id)
+    elif message.text in CATEGORIES:
+        msgs = get_messages_by_category(message.from_user.id, message.text)
+    else:
+        await message.answer("Выбери кнопку.")
+        return
 
     if not msgs:
         await message.answer("Нет сообщений.")
         return
 
-    text = "Ваши сообщения:\n\n"
-    for msg in msgs:
-        text += f"#{msg[0]} | {msg[2]} | {msg[4]}\n"
+    for msg in msgs[:10]:  # последние 10
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✉️ Ответить", callback_data=f"reply_{msg[0]}")]
+        ])
 
-    await message.answer(text)
-    await message.answer("Введите номер сообщения для ответа:")
-    await state.set_state(AdminStates.select_message)
+        await message.answer(
+            f"📩 #{msg[0]}\n"
+            f"📂 {msg[2]}\n"
+            f"📄 {msg[3]}\n"
+            f"📌 {msg[4]}",
+            reply_markup=kb
+        )
 
-# Выбор сообщения
-@router.message(AdminStates.select_message)
-async def select_message(message: types.Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("Введите номер сообщения (цифру).")
-        return
+    await state.set_state(AdminStates.view_messages)
 
-    msg_id = int(message.text)
-
-    msgs = get_messages_for_admin(message.from_user.id)
-    msg_ids = [m[0] for m in msgs]
-
-    if msg_id not in msg_ids:
-        await message.answer("Сообщение не найдено.")
-        return
+# Кнопка "ответить"
+@router.callback_query(F.data.startswith("reply_"))
+async def reply_start(callback: types.CallbackQuery, state: FSMContext):
+    msg_id = int(callback.data.split("_")[1])
 
     await state.update_data(msg_id=msg_id)
-
-    await message.answer("Введите ответ пользователю:")
+    await callback.message.answer("Напиши ответ:")
     await state.set_state(AdminStates.write_reply)
 
-# Ответ пользователю
+# Отправка ответа
 @router.message(AdminStates.write_reply)
-async def reply_to_user(message: types.Message, state: FSMContext):
+async def send_reply(message: types.Message, state: FSMContext):
     data = await state.get_data()
     msg_id = data["msg_id"]
 
-    msgs = get_messages_for_admin(message.from_user.id)
-    target_msg = None
+    msg = get_message_by_id(msg_id)
 
-    for m in msgs:
-        if m[0] == msg_id:
-            target_msg = m
-            break
-
-    if not target_msg:
+    if not msg:
         await message.answer("Ошибка.")
         return
 
-    user_id = target_msg[1]
+    user_id = msg[1]
 
-    # отправка пользователю
     await message.bot.send_message(
         user_id,
-        f"📬 Ответ на ваше сообщение #{msg_id}:\n{message.text}"
+        f"📬 Ответ на сообщение #{msg_id}:\n{message.text}"
     )
 
-    # обновляем статус
     update_message_status(msg_id, "✅")
 
     await message.answer("Ответ отправлен ✅")
     await state.clear()
+
+# ================= СТАТИСТИКА =================
+
+@router.message(AdminStates.menu, F.text == "📊 Статистика")
+async def stats(message: types.Message):
+    total, new, done, categories = get_stats(message.from_user.id)
+
+    text = f"""
+📊 Статистика:
+
+Всего: {total}
+Новые: {new}
+Отвеченные: {done}
+
+По категориям:
+"""
+
+    for cat, count in categories:
+        text += f"{cat}: {count}\n"
+
+    await message.answer(text)
