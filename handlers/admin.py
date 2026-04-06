@@ -1,7 +1,7 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from states import AdminStates
 from config import ADMINS, CATEGORIES
 from database import get_messages_for_admin, get_messages_by_category, get_message_by_id, update_message_status, get_stats
@@ -11,7 +11,6 @@ router = Router()
 def is_admin(user_id):
     return user_id in ADMINS.values()
 
-# --- /admin ---
 @router.message(Command("admin"))
 async def admin_panel(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
@@ -22,26 +21,28 @@ async def admin_panel(message: types.Message, state: FSMContext):
     await message.answer("⚙️ <b>Админ-панель</b>", parse_mode="HTML", reply_markup=kb)
     await state.set_state(AdminStates.menu)
 
-# --- Выбор сообщений ---
 @router.message(AdminStates.menu, F.text == "📩 Сообщения")
 async def choose_filter(message: types.Message, state: FSMContext):
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
     for i in range(0, len(CATEGORIES), 2):
         if i+1 < len(CATEGORIES):
-            kb.row(KeyboardButton(CATEGORIES[i]), KeyboardButton(CATEGORIES[i+1]))
+            kb.row(
+                KeyboardButton(f"💼 {CATEGORIES[i]}"),
+                KeyboardButton(f"💰 {CATEGORIES[i+1]}")
+            )
         else:
-            kb.row(KeyboardButton(CATEGORIES[i]))
+            kb.row(KeyboardButton(f"💼 {CATEGORIES[i]}"))
     kb.add(KeyboardButton("📥 Все"))
     await message.answer("📂 Выбери категорию для фильтрации:", reply_markup=kb)
     await state.set_state(AdminStates.filter_category)
 
-# --- Показ сообщений ---
 @router.message(AdminStates.filter_category)
 async def show_messages(message: types.Message, state: FSMContext):
     if message.text == "📥 Все":
         msgs = get_messages_for_admin(message.from_user.id)
-    elif message.text in CATEGORIES:
-        msgs = get_messages_by_category(message.from_user.id, message.text)
+    elif message.text.replace("💼 ","").replace("💰 ","") in CATEGORIES:
+        category = message.text.replace("💼 ","").replace("💰 ","")
+        msgs = get_messages_by_category(message.from_user.id, category)
     else:
         await message.answer("⚠️ Используй кнопки ниже!")
         return
@@ -68,7 +69,6 @@ async def show_messages(message: types.Message, state: FSMContext):
         )
     await state.set_state(AdminStates.view_messages)
 
-# --- Ответ ---
 @router.callback_query(F.data.startswith("reply_"))
 async def reply_start(callback: types.CallbackQuery, state: FSMContext):
     msg_id = int(callback.data.split("_")[1])
@@ -77,14 +77,12 @@ async def reply_start(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(AdminStates.write_reply)
     await callback.answer()
 
-# --- Пропуск ---
 @router.callback_query(F.data.startswith("skip_"))
 async def skip_message(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer("⏭ Пропущено. Следующее сообщение:")
     await show_messages(callback.message, state)
     await callback.answer()
 
-# --- Отправка ответа ---
 @router.message(AdminStates.write_reply)
 async def send_reply(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -103,12 +101,9 @@ async def send_reply(message: types.Message, state: FSMContext):
 
     update_message_status(msg_id, "✅")
     await message.answer("✅ Ответ отправлен! Следующее сообщение:")
-
-    # Цикл: сразу показываем следующие сообщения
     await show_messages(message, state)
     await state.set_state(AdminStates.view_messages)
 
-# --- Статистика ---
 @router.message(AdminStates.menu, F.text == "📊 Статистика")
 async def stats(message: types.Message):
     total, new, done, categories = get_stats(message.from_user.id)
