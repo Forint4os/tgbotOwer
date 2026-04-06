@@ -1,7 +1,7 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup
 from states import AdminStates
 from config import ADMINS, CATEGORIES
 from database import get_messages_for_admin, get_messages_by_category, get_message_by_id, update_message_status, get_stats
@@ -16,7 +16,7 @@ def is_admin(user_id):
 async def admin_panel(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     kb.add(KeyboardButton("📩 Сообщения"), KeyboardButton("📊 Статистика"))
     await message.answer("⚙️ <b>Админ-панель</b>", parse_mode="HTML", reply_markup=kb)
     await state.set_state(AdminStates.menu)
@@ -24,7 +24,7 @@ async def admin_panel(message: types.Message, state: FSMContext):
 # --- Выбор сообщений ---
 @router.message(AdminStates.menu, F.text == "📩 Сообщения")
 async def choose_filter(message: types.Message, state: FSMContext):
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
     for i in range(0, len(CATEGORIES), 2):
         if i+1 < len(CATEGORIES):
             kb.row(KeyboardButton(CATEGORIES[i]), KeyboardButton(CATEGORIES[i+1]))
