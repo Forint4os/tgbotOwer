@@ -1,70 +1,36 @@
-import sqlite3
-
-conn = sqlite3.connect("bot.db")
-cursor = conn.cursor()
-
-def init_db():
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        from_user INTEGER,
-        to_user INTEGER,
-        category TEXT,
-        text TEXT,
-        status TEXT
-    )
-    """)
-    conn.commit()
+MESSAGES = []
+MSG_COUNTER = 1
 
 def add_message(from_user, to_user, category, text):
-    cursor.execute(
-        "INSERT INTO messages (from_user, to_user, category, text, status) VALUES (?, ?, ?, ?, ?)",
-        (from_user, to_user, category, text, '🆕')
-    )
-    conn.commit()
-    return cursor.lastrowid
+    global MSG_COUNTER
+    msg = [MSG_COUNTER, from_user, category, text, "🆕"]
+    MESSAGES.append(msg)
+    MSG_COUNTER += 1
+    return msg[0]
 
 def get_messages_for_admin(admin_id):
-    cursor.execute(
-        "SELECT id, from_user, category, text, status FROM messages WHERE to_user=? ORDER BY id DESC",
-        (admin_id,)
-    )
-    return cursor.fetchall()
+    return [msg for msg in MESSAGES if msg[1] == admin_id or msg[1] != admin_id]
 
 def get_messages_by_category(admin_id, category):
-    cursor.execute(
-        "SELECT id, from_user, category, text, status FROM messages WHERE to_user=? AND category=? ORDER BY id DESC",
-        (admin_id, category)
-    )
-    return cursor.fetchall()
+    return [msg for msg in MESSAGES if msg[2] == category]
 
 def get_message_by_id(msg_id):
-    cursor.execute(
-        "SELECT id, from_user, category, text, status FROM messages WHERE id=?",
-        (msg_id,)
-    )
-    return cursor.fetchone()
+    for msg in MESSAGES:
+        if msg[0] == msg_id:
+            return msg
+    return None
 
 def update_message_status(msg_id, status):
-    cursor.execute("UPDATE messages SET status=? WHERE id=?", (status, msg_id))
-    conn.commit()
+    msg = get_message_by_id(msg_id)
+    if msg:
+        msg[4] = status
 
 def get_stats(admin_id):
-    cursor.execute("SELECT COUNT(*) FROM messages WHERE to_user=?", (admin_id,))
-    total = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM messages WHERE to_user=? AND status='🆕'", (admin_id,))
-    new = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM messages WHERE to_user=? AND status='✅'", (admin_id,))
-    done = cursor.fetchone()[0]
-
-    cursor.execute("""
-        SELECT category, COUNT(*) 
-        FROM messages 
-        WHERE to_user=? 
-        GROUP BY category
-    """, (admin_id,))
-    categories = cursor.fetchall()
-
+    total = len(MESSAGES)
+    new = len([m for m in MESSAGES if m[4] == "🆕"])
+    done = len([m for m in MESSAGES if m[4] == "✅"])
+    categories = []
+    for cat in ["💼 Работа", "💰 Выплата", "🤝 Коллаб", "⚠️ Ошибки", "🆘 Поддержка", "👤 Личное", "📌 Другое"]:
+        count = len([m for m in MESSAGES if m[2] == cat])
+        categories.append((cat, count))
     return total, new, done, categories
