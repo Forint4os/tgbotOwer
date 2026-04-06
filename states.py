@@ -6,10 +6,9 @@ class UserStates(StatesGroup):
     confirm_receiver = State()
     write_message = State()
     confirm_send = State()
-    optional_ai = State()
 
 class AdminStates(StatesGroup):
     menu = State()
-    select_category = State()
-    select_message = State()
+    filter_category = State()
+    view_messages = State()
     write_reply = State()
