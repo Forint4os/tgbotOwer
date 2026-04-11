@@ -41,3 +41,12 @@ def get_ticket(ticket_id):
 def mark_answered(ticket_id):
     cursor.execute("UPDATE tickets SET answered=1 WHERE id=?", (ticket_id,))
     conn.commit()
+
+def get_stats():
+    cursor.execute("SELECT COUNT(*) FROM tickets")
+    total = cursor.fetchone()[0]
+
+    cursor.execute("SELECT category, COUNT(*) FROM tickets GROUP BY category")
+    by_cat = cursor.fetchall()
+
+    return total, by_cat
