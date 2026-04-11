@@ -3,7 +3,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 
 from config import TOKEN
-from handlers import user
+from handlers import user, admin
 
 async def main():
     bot = Bot(
@@ -14,6 +14,9 @@ async def main():
     dp = Dispatcher()
 
     dp.include_router(user.router)
+    dp.include_router(admin.router)
+
+    print("🤖 Бот запущен!")
 
     await dp.start_polling(bot)
 
