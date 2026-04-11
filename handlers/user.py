@@ -1,128 +1,105 @@
-import time
-
 from aiogram import Router, F
-from aiogram.types import Message, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery
+from aiogram.fsm.context import FSMContext
 
-from keyboards.user_kb import main_menu
-from utils.tickets import create_ticket
 from config import ADMIN_ID
+from keyboards.user_kb import main_menu, receiver_menu, back_menu
+from states import UserFlow
+from utils.tickets import create_ticket
 
 router = Router()
 
-user_state = {}
-spam_limit = {}
-receivers = {}
 
 # ---------------- START ----------------
 @router.message(F.text == "/start")
-async def start(message: Message):
-    user_state[message.from_user.id] = None
-    receivers[message.from_user.id] = None
+async def start(message: Message, state: FSMContext):
+    await state.set_state(UserFlow.menu)
 
     await message.answer(
-        "👋 <b>Система активна</b>\n\nВыберите действие:",
+        "👋 <b>Система активна</b>",
         reply_markup=main_menu()
     )
 
 
-# ---------------- WRITE FLOW ENTRY ----------------
-@router.message(F.text == "📩 Написать")
-async def choose_receiver(message: Message):
-    user_state[message.from_user.id] = "choose_receiver"
+# ---------------- MENU CLICK ----------------
+@router.callback_query(F.data == "write")
+async def write(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(UserFlow.choose_receiver)
 
-    kb = ReplyKeyboardMarkup(
-        keyboard=[
-            [F"👑 Admin"],
-            ["💼 Работа", "💡 Предложения"],
-            ["💰 Зарплата", "🤝 Коллаборация"],
-            ["⚠️ Ошибки", "📞 Поддержка"],
-            ["👤 Личное", "📦 Другое"]
-        ],
-        resize_keyboard=True
+    await callback.message.edit_text(
+        "📨 <b>Выберите тему:</b>",
+        reply_markup=receiver_menu()
     )
 
-    await message.answer(
-        "📨 <b>Выберите тему / получателя:</b>",
-        reply_markup=kb
-    )
+    await callback.answer()
 
 
-# ---------------- SELECT CATEGORY ----------------
-@router.message(F.text.in_([
-    "👑 Admin",
-    "💼 Работа",
-    "💡 Предложения",
-    "💰 Зарплата",
-    "🤝 Коллаборация",
-    "⚠️ Ошибки",
-    "📞 Поддержка",
-    "👤 Личное",
-    "📦 Другое"
-]))
-async def category_selected(message: Message):
-    receivers[message.from_user.id] = message.text
-    user_state[message.from_user.id] = "write_message"
+# ---------------- RECEIVER ----------------
+@router.callback_query(F.data.startswith("rcv_"))
+async def receiver(callback: CallbackQuery, state: FSMContext):
 
-    await message.answer(
+    mapping = {
+        "rcv_admin": "Admin",
+        "rcv_work": "Работа",
+        "rcv_offer": "Предложения",
+        "rcv_salary": "Зарплата",
+        "rcv_bug": "Ошибки",
+        "rcv_support": "Поддержка",
+        "rcv_private": "Личное",
+        "rcv_other": "Другое",
+    }
+
+    choice = mapping.get(callback.data, "Unknown")
+
+    await state.update_data(receiver=choice)
+    await state.set_state(UserFlow.write_message)
+
+    await callback.message.edit_text(
         "✍️ <b>Напишите сообщение одним текстом:</b>",
-        reply_markup=ReplyKeyboardRemove()  # 🔥 КЛАВИАТУРА ИСЧЕЗАЕТ
+        reply_markup=back_menu()
     )
 
+    await callback.answer()
 
-# ---------------- MAIN FLOW (IMPORTANT FIX) ----------------
-@router.message()
-async def handler(message: Message):
 
-    uid = message.from_user.id
-    text = message.text
+# ---------------- BACK ----------------
+@router.callback_query(F.data == "back")
+async def back(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(UserFlow.menu)
 
-    # ---------------- /ADMIN FIX (GLOBAL, ALWAYS WORKS) ----------------
-    if text == "/admin":
-        await message.answer(
-            "👨‍💻 <b>Админ режим активирован</b>",
-            reply_markup=main_menu()
-        )
-        return
-
-    # ---------------- SPAM ----------------
-    now = time.time()
-    if uid in spam_limit and now - spam_limit[uid] < 2:
-        return
-    spam_limit[uid] = now
-
-    state = user_state.get(uid)
-
-    # ---------------- SEND MESSAGE ----------------
-    if state == "write_message":
-        user_state[uid] = None
-
-        receiver = receivers.get(uid, "unknown")
-
-        ticket = create_ticket(
-            user_id=uid,
-            username=message.from_user.username or "no_username",
-            category=receiver,
-            text=text
-        )
-
-        await message.answer(
-            "✅ <b>Сообщение отправлено</b>\n"
-            "⏳ Ожидайте ответа",
-            reply_markup=main_menu()
-        )
-
-        await message.bot.send_message(
-            ADMIN_ID,
-            f"📩 <b>Новый тикет #{ticket['id']}</b>\n"
-            f"👤 @{ticket['username']}\n"
-            f"🎯 {ticket['category']}\n\n"
-            f"💬 {ticket['text']}"
-        )
-
-        return
-
-    # ---------------- DEFAULT (ONLY IF NOT HANDLED) ----------------
-    await message.answer(
-        "👇 <b>Используйте меню ниже</b>",
+    await callback.message.edit_text(
+        "🏠 <b>Главное меню</b>",
         reply_markup=main_menu()
     )
+
+    await callback.answer()
+
+
+# ---------------- MESSAGE INPUT ----------------
+@router.message(UserFlow.write_message)
+async def send(message: Message, state: FSMContext):
+
+    data = await state.get_data()
+    receiver = data.get("receiver", "unknown")
+
+    ticket = create_ticket(
+        user_id=message.from_user.id,
+        username=message.from_user.username or "no_username",
+        category=receiver,
+        text=message.text
+    )
+
+    await message.answer(
+        "✅ <b>Отправлено</b>\n⏳ Ожидайте ответ",
+        reply_markup=main_menu()
+    )
+
+    await message.bot.send_message(
+        ADMIN_ID,
+        f"📩 <b>Тикет #{ticket['id']}</b>\n"
+        f"👤 @{ticket['username']}\n"
+        f"🎯 {ticket['category']}\n\n"
+        f"💬 {ticket['text']}"
+    )
+
+    await state.clear()
