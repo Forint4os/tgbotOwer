@@ -8,6 +8,6 @@ class UserFlow(StatesGroup):
 
 
 class AdminFlow(StatesGroup):
-    idle = State()
+    menu = State()
     viewing_ticket = State()
     replying = State()
