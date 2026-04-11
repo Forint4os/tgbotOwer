@@ -1,11 +1,20 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 def admin_menu():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📋 Тикеты"), KeyboardButton(text="📊 Статистика")],
-            [KeyboardButton(text="🚪 Выйти")]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📋 Тикеты", callback_data="adm_tickets")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="adm_stats")]
+    ])
+
+
+def ticket_actions(ticket_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✍️ Ответить", callback_data=f"adm_reply:{ticket_id}"),
+            InlineKeyboardButton(text="✅ Закрыть", callback_data=f"adm_close:{ticket_id}")
         ],
-        resize_keyboard=True
-    )
+        [
+            InlineKeyboardButton(text="🔙 Назад", callback_data="adm_back")
+        ]
+    ])
