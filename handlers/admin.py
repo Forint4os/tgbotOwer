@@ -1,5 +1,10 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
 from aiogram.fsm.context import FSMContext
 
 from config import ADMIN_ID
@@ -10,7 +15,7 @@ from keyboards.admin_kb import admin_menu, ticket_actions
 router = Router()
 
 
-# ---------------- /ADMIN ALWAYS WORK ----------------
+# ---------------- /ADMIN ENTRY ----------------
 @router.message(F.text == "/admin")
 async def admin_entry(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
@@ -24,7 +29,7 @@ async def admin_entry(message: Message, state: FSMContext):
     )
 
 
-# ---------------- OPEN TICKETS LIST ----------------
+# ---------------- TICKETS LIST ----------------
 @router.callback_query(F.data == "adm_tickets")
 async def tickets(callback: CallbackQuery):
 
@@ -40,21 +45,23 @@ async def tickets(callback: CallbackQuery):
         status = "❌" if t[5] == 0 else "✅"
         text += f"{status} #{t[0]} | @{t[2]} | {t[3]}\n"
 
-    kb = []
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"Открыть #{t[0]}",
+                    callback_data=f"adm_open:{t[0]}"
+                )
+            ]
+            for t in tickets[:10]
+        ]
+    )
 
-    for t in tickets[:10]:
-        kb.append([
-            InlineKeyboardButton(
-                text=f"Открыть #{t[0]}",
-                callback_data=f"adm_open:{t[0]}"
-            )
-        ])
-
-    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await callback.message.edit_text(text, reply_markup=kb)
     await callback.answer()
 
 
-# ---------------- OPEN SINGLE TICKET ----------------
+# ---------------- OPEN TICKET ----------------
 @router.callback_query(F.data.startswith("adm_open:"))
 async def open_ticket(callback: CallbackQuery, state: FSMContext):
 
@@ -92,7 +99,7 @@ async def reply_mode(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# ---------------- RECEIVE ADMIN REPLY ----------------
+# ---------------- RECEIVE REPLY ----------------
 @router.message(AdminFlow.replying)
 async def send_reply(message: Message, state: FSMContext):
 
