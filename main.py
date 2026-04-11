@@ -9,7 +9,6 @@ from database.db import init_db
 
 
 async def main():
-    # инициализация базы данных
     init_db()
 
     bot = Bot(
@@ -19,13 +18,16 @@ async def main():
 
     dp = Dispatcher()
 
-    # подключаем роутеры
     dp.include_router(user.router)
     dp.include_router(admin.router)
 
-    print("🤖 Бот запущен!")
+    print("🤖 Bot started")
 
-    await dp.start_polling(bot)
+    await dp.start_polling(
+        bot,
+        skip_updates=True,
+        allowed_updates=["message", "callback_query"]
+    )
 
 
 if __name__ == "__main__":
