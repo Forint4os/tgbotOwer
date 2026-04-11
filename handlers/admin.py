@@ -1,17 +1,27 @@
 from aiogram import Router, F
 from aiogram.types import Message
-from config import ADMIN_ID
-from utils.stats import get_stats
 
 router = Router()
 
+ADMIN_ID = 5476359789
+ADMIN_PASSWORD = "123"
 
-@router.message(F.text == "/admin")
-async def admin_panel(message: Message):
+admin_logged = set()
+
+
+@router.message(F.text.startswith("/admin"))
+async def admin_login(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
 
-    await message.answer(
-        f"👨‍💻 <b>Админ панель</b>\n\n"
-        f"📊 Пользователей: {get_stats()}"
-    )
+    parts = message.text.split()
+
+    if len(parts) < 2:
+        await message.answer("🔐 Введите пароль: /admin 123")
+        return
+
+    if parts[1] == ADMIN_PASSWORD:
+        admin_logged.add(message.from_user.id)
+        await message.answer("👨‍💻 Админ панель активирована")
+    else:
+        await message.answer("❌ Неверный пароль")
