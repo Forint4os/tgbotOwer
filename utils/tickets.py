@@ -1,31 +1,17 @@
-tickets = []
-ticket_id = 0
+from database.db import add_ticket
 
 
 def create_ticket(user_id: int, username: str, category: str, text: str):
-    global ticket_id
+    """
+    Создаёт тикет в базе данных и возвращает структуру тикета
+    """
 
-    ticket_id += 1
+    ticket_id = add_ticket(user_id, username, category, text)
 
-    ticket = {
+    return {
         "id": ticket_id,
         "user_id": user_id,
         "username": username,
         "category": category,
-        "text": text,
-        "answered": False
+        "text": text
     }
-
-    tickets.append(ticket)
-    return ticket
-
-
-def get_tickets():
-    return tickets
-
-
-def get_ticket_by_id(tid: int):
-    for t in tickets:
-        if t["id"] == tid:
-            return t
-    return None
