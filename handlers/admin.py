@@ -1,13 +1,14 @@
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 
 from config import ADMIN_ID
-from database.db import get_tickets, get_ticket, mark_answered
+from database.db import get_tickets, get_ticket, mark_answered, get_stats
 from keyboards.admin_kb import admin_menu
+from keyboards.tickets_kb import tickets_keyboard
 
 router = Router()
 
-admin_session = set()
+admin_state = {}
 
 
 # ---------------- LOGIN ----------------
@@ -22,15 +23,13 @@ async def admin_login(message: Message):
         await message.answer("🔐 /admin 123")
         return
 
-    admin_session.add(message.from_user.id)
-
     await message.answer(
-        "👨‍💻 Админ панель активирована",
+        "👨‍💻 <b>Админ панель активирована</b>",
         reply_markup=admin_menu()
     )
 
 
-# ---------------- TICKETS LIST ----------------
+# ---------------- TICKETS ----------------
 @router.message(F.text == "📋 Тикеты")
 async def tickets_list(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -42,70 +41,78 @@ async def tickets_list(message: Message):
         await message.answer("📭 тикетов нет")
         return
 
-    text = "📋 <b>Последние тикеты:</b>\n\n"
-
-    for t in tickets:
-        status = "❌" if t[5] == 0 else "✅"
-        text += f"{status} #{t[0]} | {t[3]} | @{t[2]}\n"
-
-    text += "\n👉 Напиши: open ID (например open 3)"
-
-    await message.answer(text)
+    await message.answer(
+        "📋 <b>Тикеты:</b>",
+        reply_markup=tickets_keyboard(tickets)
+    )
 
 
-# ---------------- OPEN TICKET ----------------
-@router.message(F.text.startswith("open"))
-async def open_ticket(message: Message):
-    if message.from_user.id != ADMIN_ID:
+# ---------------- OPEN TICKET (INLINE) ----------------
+@router.callback_query(F.data.startswith("ticket_"))
+async def open_ticket(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
         return
 
-    parts = message.text.split()
-
-    if len(parts) < 2:
-        await message.answer("❌ open ID")
-        return
-
-    ticket = get_ticket(int(parts[1]))
+    ticket_id = int(callback.data.split("_")[1])
+    ticket = get_ticket(ticket_id)
 
     if not ticket:
-        await message.answer("❌ не найден")
+        await callback.answer("Не найдено")
         return
 
-    await message.answer(
+    admin_state[callback.from_user.id] = ticket_id
+
+    await callback.message.answer(
         f"📩 <b>Тикет #{ticket[0]}</b>\n"
         f"👤 @{ticket[2]}\n"
         f"📂 {ticket[3]}\n\n"
         f"💬 {ticket[4]}\n\n"
-        f"✍️ Ответь командой:\nreply {ticket[0]} текст"
+        f"✍️ Напишите ответ одним сообщением"
     )
 
+    await callback.answer()
 
-# ---------------- REPLY ----------------
-@router.message(F.text.startswith("reply"))
-async def reply_ticket(message: Message):
+
+# ---------------- ANSWER MESSAGE ----------------
+@router.message()
+async def admin_reply(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
 
-    parts = message.text.split(maxsplit=2)
+    ticket_id = admin_state.get(message.from_user.id)
 
-    if len(parts) < 3:
-        await message.answer("❌ reply ID текст")
+    if not ticket_id:
         return
-
-    ticket_id = int(parts[1])
-    text = parts[2]
 
     ticket = get_ticket(ticket_id)
 
     if not ticket:
-        await message.answer("❌ не найден")
+        await message.answer("❌ тикет не найден")
         return
 
     await message.bot.send_message(
         ticket[1],
-        f"📩 <b>Ответ администратора:</b>\n\n{text}"
+        f"📩 <b>Ответ поддержки:</b>\n\n{message.text}"
     )
 
     mark_answered(ticket_id)
 
+    admin_state[message.from_user.id] = None
+
     await message.answer("✅ отправлено")
+    
+
+# ---------------- STATS ----------------
+@router.message(F.text == "📊 Статистика")
+async def stats(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    total, by_cat = get_stats()
+
+    text = f"📊 <b>Статистика</b>\n\nВсего тикетов: {total}\n\n"
+
+    for cat, count in by_cat:
+        text += f"📂 {cat}: {count}\n"
+
+    await message.answer(text)
