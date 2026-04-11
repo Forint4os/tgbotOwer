@@ -1,7 +1,7 @@
 import time
 
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 
 from keyboards.user_kb import main_menu
 from utils.tickets import create_ticket
@@ -11,24 +11,13 @@ router = Router()
 
 user_state = {}
 spam_limit = {}
+receivers = {}
 
-CATEGORIES = {
-    "📩 Написать": "write",
-    "🆘 Помощь": "help",
-    "💼 Работа": "work",
-    "💡 Предложения": "offer",
-    "💰 Зарплата": "salary",
-    "🤝 Коллаборация": "collab",
-    "⚠️ Ошибки": "bug",
-    "📞 Поддержка": "support",
-    "👤 Личное": "private",
-    "📦 Другое": "other"
-}
-
-
+# ---------------- START ----------------
 @router.message(F.text == "/start")
 async def start(message: Message):
     user_state[message.from_user.id] = None
+    receivers[message.from_user.id] = None
 
     await message.answer(
         "👋 <b>Система активна</b>\n\nВыберите действие 👇",
@@ -36,15 +25,52 @@ async def start(message: Message):
     )
 
 
-@router.message(F.text.in_(list(CATEGORIES.keys())))
-async def category(message: Message):
-    user_state[message.from_user.id] = CATEGORIES[message.text]
+# ---------------- OPEN WRITE FLOW ----------------
+@router.message(F.text == "📩 Написать")
+async def choose_receiver(message: Message):
+    user_state[message.from_user.id] = "choose_receiver"
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="👑 Admin 1"),
+                KeyboardButton(text="👑 Admin 2"),
+            ],
+            [
+                KeyboardButton(text="👤 Slot 1"),
+                KeyboardButton(text="👤 Slot 2"),
+            ],
+            [
+                KeyboardButton(text="👤 Slot 3"),
+                KeyboardButton(text="👤 Slot 4"),
+            ],
+        ],
+        resize_keyboard=True
+    )
 
     await message.answer(
-        "✍️ Напишите сообщение одним текстом:"
+        "📨 <b>Выберите получателя:</b>",
+        reply_markup=kb
     )
 
 
+# ---------------- RECEIVER SELECT ----------------
+@router.message(F.text.in_([
+    "👑 Admin 1", "👑 Admin 2",
+    "👤 Slot 1", "👤 Slot 2",
+    "👤 Slot 3", "👤 Slot 4"
+]))
+async def receiver_selected(message: Message):
+    receivers[message.from_user.id] = message.text
+    user_state[message.from_user.id] = "write_message"
+
+    await message.answer(
+        "✍️ <b>Напишите сообщение одним текстом:</b>",
+        reply_markup=main_menu()
+    )
+
+
+# ---------------- MAIN HANDLER ----------------
 @router.message()
 async def handler(message: Message):
 
@@ -60,28 +86,37 @@ async def handler(message: Message):
 
     state = user_state.get(uid)
 
-    if state:
+    # ---------------- WRITE MESSAGE FLOW ----------------
+    if state == "write_message":
         user_state[uid] = None
+
+        receiver = receivers.get(uid, "unknown")
 
         ticket = create_ticket(
             user_id=uid,
             username=message.from_user.username or "no_username",
-            category=state,
+            category=receiver,
             text=message.text
         )
 
         await message.answer(
-            "✅ <b>Принято</b>\n📨 Отправлено администрации"
+            "✅ <b>Сообщение отправлено</b>\n"
+            "📨 Принято системой\n"
+            "⏳ Ожидайте ответа"
         )
 
         await message.bot.send_message(
             ADMIN_ID,
-            f"📩 Новый тикет #{ticket['id']}\n"
+            f"📩 <b>Новый тикет #{ticket['id']}</b>\n"
             f"👤 @{ticket['username']}\n"
-            f"📂 {ticket['category']}\n\n"
-            f"{ticket['text']}"
+            f"🎯 Получатель: {ticket['category']}\n\n"
+            f"💬 {ticket['text']}"
         )
 
         return
 
-    await message.answer("ℹ️ Используйте меню 👇", reply_markup=main_menu())
+    # ---------------- DEFAULT ----------------
+    await message.answer(
+        "ℹ️ <b>Используйте меню ниже</b>",
+        reply_markup=main_menu()
+    )
