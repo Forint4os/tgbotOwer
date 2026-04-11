@@ -1,42 +1,42 @@
 from aiogram import Router, F
 from aiogram.types import Message
 
-from keyboards.main_kb import main_keyboard
-from utils.stats import add_user, get_stats
-from config import ADMIN_ID
+from keyboards.user_kb import main_menu
 
 router = Router()
 
+# временное хранение состояния (позже заменим на БД)
+user_state = {}
 
 @router.message(F.text == "/start")
 async def start(message: Message):
-    add_user(message.from_user.id)
+    user_state[message.from_user.id] = None
 
     await message.answer(
-        "👋 <b>Добро пожаловать!</b>\nБот работает стабильно.",
-        reply_markup=main_keyboard()
+        "👋 <b>Система активна</b>\nВыберите действие:",
+        reply_markup=main_menu()
     )
+
+
+@router.message(F.text == "📩 Написать")
+async def write_start(message: Message):
+    user_state[message.from_user.id] = "write"
+
+    await message.answer("✍️ Напишите ваше сообщение одним текстом:")
 
 
 @router.message()
-async def all_messages(message: Message):
-    add_user(message.from_user.id)
+async def handler(message: Message):
+    state = user_state.get(message.from_user.id)
 
-    text = message.text.lower() if message.text else ""
+    if state == "write":
+        user_state[message.from_user.id] = None
 
-    if text == "📊 статистика":
-        await message.answer(f"📊 Пользователей: {get_stats()}")
+        await message.answer(
+            "✅ Принято!\n📨 Ваше сообщение отправлено администрации.\n⏳ Ожидайте ответ."
+        )
+
+        # тут позже будет отправка админу
         return
 
-    if text == "ℹ️ помощь":
-        await message.answer("ℹ️ Просто пиши сообщения — я отвечу.")
-        return
-
-    if text == "👨‍💻 админ":
-        await message.answer("👨‍💻 Админ ID активен.")
-        return
-
-    # основной авто-ответ
-    await message.answer(
-        f"🤖 Я получил сообщение:\n\n<b>{message.text}</b>"
-    )
+    await message.answer("ℹ️ Используйте меню ниже 👇")
