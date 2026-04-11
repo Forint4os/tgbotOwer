@@ -5,38 +5,57 @@ from keyboards.user_kb import main_menu
 
 router = Router()
 
-# временное хранение состояния (позже заменим на БД)
 user_state = {}
+
+CATEGORIES = {
+    "📩 Написать": "write",
+    "🆘 Помощь": "help",
+    "💼 Работа": "work",
+    "💡 Предложения": "offer",
+    "💰 Зарплата": "salary",
+    "🤝 Коллаборация": "collab",
+    "⚠️ Ошибки": "bug",
+    "📞 Поддержка": "support",
+    "👤 Личное": "private",
+    "📦 Другое": "other"
+}
+
 
 @router.message(F.text == "/start")
 async def start(message: Message):
     user_state[message.from_user.id] = None
 
     await message.answer(
-        "👋 <b>Система активна</b>\nВыберите действие:",
+        "👋 <b>Система активна</b>\n\nВыберите действие ниже 👇",
         reply_markup=main_menu()
     )
 
 
-@router.message(F.text == "📩 Написать")
-async def write_start(message: Message):
-    user_state[message.from_user.id] = "write"
+# 🔥 ЛЮБАЯ КНОПКА → режим ввода
+@router.message(F.text.in_(list(CATEGORIES.keys())))
+async def category_handler(message: Message):
+    user_state[message.from_user.id] = CATEGORIES[message.text]
 
-    await message.answer("✍️ Напишите ваше сообщение одним текстом:")
+    await message.answer(
+        "✍️ <b>Напишите ваше сообщение одним текстом:</b>\n\n"
+        "📨 Оно будет отправлено администрации."
+    )
 
 
 @router.message()
-async def handler(message: Message):
+async def message_handler(message: Message):
     state = user_state.get(message.from_user.id)
 
-    if state == "write":
+    if state:
         user_state[message.from_user.id] = None
 
         await message.answer(
-            "✅ Принято!\n📨 Ваше сообщение отправлено администрации.\n⏳ Ожидайте ответ."
+            "✅ <b>Сообщение принято</b>\n"
+            "📨 Отправлено в обработку\n"
+            "⏳ Ожидайте ответ от администрации"
         )
-
-        # тут позже будет отправка админу
         return
 
-    await message.answer("ℹ️ Используйте меню ниже 👇")
+    await message.answer(
+        "ℹ️ <b>Используйте кнопки меню ниже</b> 👇"
+    )
