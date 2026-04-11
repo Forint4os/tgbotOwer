@@ -8,7 +8,7 @@ def admin_menu():
     ])
 
 
-def tickets_page(page: int, tickets, per_page=5):
+def tickets_page(page: int, tickets, per_page: int = 5):
 
     start = page * per_page
     end = start + per_page
@@ -30,12 +30,18 @@ def tickets_page(page: int, tickets, per_page=5):
 
     if page > 0:
         nav.append(
-            InlineKeyboardButton(text="⬅️", callback_data=f"adm_tickets:{page-1}")
+            InlineKeyboardButton(
+                text="⬅️",
+                callback_data=f"adm_tickets:{page-1}"
+            )
         )
 
     if end < len(tickets):
         nav.append(
-            InlineKeyboardButton(text="➡️", callback_data=f"adm_tickets:{page+1}")
+            InlineKeyboardButton(
+                text="➡️",
+                callback_data=f"adm_tickets:{page+1}"
+            )
         )
 
     if nav:
@@ -46,3 +52,25 @@ def tickets_page(page: int, tickets, per_page=5):
     ])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def ticket_actions(ticket_id: int):
+
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="✍️ Ответить",
+                callback_data=f"adm_reply:{ticket_id}"
+            ),
+            InlineKeyboardButton(
+                text="✅ Закрыть",
+                callback_data=f"adm_close:{ticket_id}"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🔙 В список",
+                callback_data="adm_tickets:0"
+            )
+        ]
+    ])
