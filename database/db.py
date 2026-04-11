@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect("bot.db")
+conn = sqlite3.connect("bot.db", check_same_thread=False)
 cursor = conn.cursor()
 
 
@@ -18,18 +18,19 @@ def init_db():
     conn.commit()
 
 
+# ---------------- TICKETS ----------------
 def add_ticket(user_id, username, category, text):
     cursor.execute("""
     INSERT INTO tickets (user_id, username, category, text)
     VALUES (?, ?, ?, ?)
     """, (user_id, username, category, text))
-    conn.commit()
 
+    conn.commit()
     return cursor.lastrowid
 
 
 def get_tickets():
-    cursor.execute("SELECT * FROM tickets ORDER BY id DESC LIMIT 20")
+    cursor.execute("SELECT * FROM tickets ORDER BY id DESC LIMIT 50")
     return cursor.fetchall()
 
 
@@ -39,9 +40,14 @@ def get_ticket(ticket_id):
 
 
 def mark_answered(ticket_id):
-    cursor.execute("UPDATE tickets SET answered=1 WHERE id=?", (ticket_id,))
+    cursor.execute(
+        "UPDATE tickets SET answered=1 WHERE id=?",
+        (ticket_id,)
+    )
     conn.commit()
 
+
+# ---------------- STATS ----------------
 def get_stats():
     cursor.execute("SELECT COUNT(*) FROM tickets")
     total = cursor.fetchone()[0]
