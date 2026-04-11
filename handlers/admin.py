@@ -5,23 +5,20 @@ from config import ADMIN_ID
 from database.db import get_tickets, get_ticket, mark_answered, get_stats
 from keyboards.admin_kb import admin_menu
 from keyboards.tickets_kb import tickets_keyboard
+from handlers.user import user_state
 
 router = Router()
 
 admin_state = {}
 
 
-# ---------------- LOGIN ----------------
+# ---------------- ADMIN LOGIN ----------------
 @router.message(F.text.startswith("/admin"))
 async def admin_login(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
 
-    parts = message.text.split()
-
-    if len(parts) < 2 or parts[1] != "123":
-        await message.answer("🔐 /admin 123")
-        return
+    user_state[message.from_user.id] = None  # сброс user flow
 
     await message.answer(
         "👨‍💻 <b>Админ панель активирована</b>",
@@ -29,7 +26,7 @@ async def admin_login(message: Message):
     )
 
 
-# ---------------- TICKETS ----------------
+# ---------------- TICKETS LIST ----------------
 @router.message(F.text == "📋 Тикеты")
 async def tickets_list(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -38,16 +35,16 @@ async def tickets_list(message: Message):
     tickets = get_tickets()
 
     if not tickets:
-        await message.answer("📭 тикетов нет")
+        await message.answer("📭 Тикетов нет")
         return
 
     await message.answer(
-        "📋 <b>Тикеты:</b>",
+        "📋 <b>Список тикетов:</b>",
         reply_markup=tickets_keyboard(tickets)
     )
 
 
-# ---------------- OPEN TICKET (INLINE) ----------------
+# ---------------- OPEN TICKET ----------------
 @router.callback_query(F.data.startswith("ticket_"))
 async def open_ticket(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
@@ -57,15 +54,15 @@ async def open_ticket(callback: CallbackQuery):
     ticket = get_ticket(ticket_id)
 
     if not ticket:
-        await callback.answer("Не найдено")
+        await callback.answer("❌ Не найден")
         return
 
     admin_state[callback.from_user.id] = ticket_id
 
     await callback.message.answer(
-        f"📩 <b>Тикет #{ticket[0]}</b>\n"
+        f"📩 <b>Тикет #{ticket[0]}</b>\n\n"
         f"👤 @{ticket[2]}\n"
-        f"📂 {ticket[3]}\n\n"
+        f"🎯 {ticket[3]}\n\n"
         f"💬 {ticket[4]}\n\n"
         f"✍️ Напишите ответ одним сообщением"
     )
@@ -73,7 +70,7 @@ async def open_ticket(callback: CallbackQuery):
     await callback.answer()
 
 
-# ---------------- ANSWER MESSAGE ----------------
+# ---------------- ADMIN REPLY ----------------
 @router.message()
 async def admin_reply(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -92,17 +89,17 @@ async def admin_reply(message: Message):
 
     await message.bot.send_message(
         ticket[1],
-        f"📩 <b>Ответ поддержки:</b>\n\n{message.text}"
+        f"📩 <b>Ответ администратора:</b>\n\n{message.text}"
     )
 
     mark_answered(ticket_id)
 
     admin_state[message.from_user.id] = None
 
-    await message.answer("✅ отправлено")
-    
+    await message.answer("✅ Ответ отправлен")
 
-# ---------------- STATS ----------------
+
+# ---------------- STATISTICS ----------------
 @router.message(F.text == "📊 Статистика")
 async def stats(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -110,7 +107,8 @@ async def stats(message: Message):
 
     total, by_cat = get_stats()
 
-    text = f"📊 <b>Статистика</b>\n\nВсего тикетов: {total}\n\n"
+    text = "📊 <b>Статистика системы</b>\n\n"
+    text += f"📌 Всего тикетов: {total}\n\n"
 
     for cat, count in by_cat:
         text += f"📂 {cat}: {count}\n"
