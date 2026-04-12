@@ -15,6 +15,7 @@ class TicketState(StatesGroup):
     write_message = State()
 
 
+# ---------------- START ----------------
 @router.message(F.text.in_({"/start", "start"}))
 async def start(message: Message):
 
@@ -24,11 +25,12 @@ async def start(message: Message):
     ])
 
     await message.answer(
-        "👋 Система активна",
+        "👋 <b>Система активна</b>\nВыберите действие:",
         reply_markup=kb
     )
 
 
+# ---------------- WRITE ----------------
 @router.callback_query(F.data == "write")
 async def write(callback: CallbackQuery, state: FSMContext):
 
@@ -51,6 +53,7 @@ async def write(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+# ---------------- CHOOSE ADMIN ----------------
 @router.callback_query(F.data.startswith("admin_"))
 async def choose_admin(callback: CallbackQuery, state: FSMContext):
 
@@ -77,10 +80,11 @@ async def choose_admin(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+# ---------------- CATEGORY ----------------
 @router.callback_query(F.data.startswith("cat_"))
 async def choose_category(callback: CallbackQuery, state: FSMContext):
 
-    cat_map = {
+    map_cat = {
         "cat_salary": "Зарплата",
         "cat_offer": "Предложение",
         "cat_bug": "Ошибка",
@@ -88,7 +92,7 @@ async def choose_category(callback: CallbackQuery, state: FSMContext):
         "cat_other": "Другое"
     }
 
-    category = cat_map.get(callback.data, "Другое")
+    category = map_cat.get(callback.data, "Другое")
 
     await state.update_data(category=category)
     await state.set_state(TicketState.write_message)
@@ -100,6 +104,7 @@ async def choose_category(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+# ---------------- MESSAGE ----------------
 @router.message(TicketState.write_message)
 async def send_ticket(message: Message, state: FSMContext):
 
@@ -114,12 +119,12 @@ async def send_ticket(message: Message, state: FSMContext):
 
     await message.bot.send_message(
         data["admin_id"],
-        f"📩 Новый тикет #{ticket_id}\n"
+        f"📩 <b>Новый тикет #{ticket_id}</b>\n"
         f"📂 {data['category']}\n"
         f"👤 {message.from_user.id}\n\n"
         f"💬 {message.text}"
     )
 
-    await message.answer("✅ Отправлено")
+    await message.answer("✅ <b>Отправлено</b>")
 
     await state.clear()
