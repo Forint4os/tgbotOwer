@@ -7,20 +7,16 @@ from aiogram.client.default import DefaultBotProperties
 
 from config import TOKEN
 from database.db import init_db
-
 from handlers import user, admin
 
-
-# ---------------- LOGGING ----------------
 logging.basicConfig(level=logging.INFO)
 
 
-# ---------------- MAIN ----------------
 async def main():
-    # init DB
+
     init_db()
 
-    # bot
+    # ❗ НОРМАЛЬНЫЙ bot (без aiohttp вручную)
     bot = Bot(
         token=TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -28,13 +24,15 @@ async def main():
 
     dp = Dispatcher()
 
-    # routers
     dp.include_router(user.router)
     dp.include_router(admin.router)
 
     print("🤖 Bot started")
 
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
 
 
 if __name__ == "__main__":
