@@ -43,8 +43,8 @@ def create_ticket(user_id: int, admin_id: int, category: str, message: str):
     return ticket_id
 
 
-# ---------------- GET ALL TICKETS ----------------
-def get_all_tickets():
+# ---------------- GET ALL TICKETS (MAIN FUNCTION) ----------------
+def get_tickets():
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
@@ -55,6 +55,7 @@ def get_all_tickets():
     """)
 
     rows = cur.fetchall()
+
     conn.close()
     return rows
 
@@ -65,18 +66,19 @@ def get_tickets_by_admin(admin_id: int):
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT id, user_id, category, message, status
+        SELECT id, user_id, category, message, status, created_at
         FROM tickets
         WHERE admin_id = ?
         ORDER BY id DESC
     """, (admin_id,))
 
     rows = cur.fetchall()
+
     conn.close()
     return rows
 
 
-# ---------------- GET SINGLE TICKET ----------------
+# ---------------- GET ONE TICKET ----------------
 def get_ticket(ticket_id: int):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
@@ -88,11 +90,12 @@ def get_ticket(ticket_id: int):
     """, (ticket_id,))
 
     row = cur.fetchone()
+
     conn.close()
     return row
 
 
-# ---------------- MARK AS ANSWERED ----------------
+# ---------------- MARK ANSWERED ----------------
 def mark_answered(ticket_id: int):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
