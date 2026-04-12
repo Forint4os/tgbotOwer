@@ -16,7 +16,6 @@ async def main():
 
     init_db()
 
-    # ❗ НОРМАЛЬНЫЙ bot (без aiohttp вручную)
     bot = Bot(
         token=TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
