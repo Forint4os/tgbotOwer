@@ -1,24 +1,14 @@
 import asyncio
-import logging
-
 from aiogram import Bot, Dispatcher
-from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 
 from config import TOKEN
-from database.db import init_db
 from handlers import user, admin
 
-logging.basicConfig(level=logging.INFO)
-
-
 async def main():
-
-    init_db()
-
     bot = Bot(
         token=TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        default=DefaultBotProperties(parse_mode="HTML")
     )
 
     dp = Dispatcher()
@@ -28,11 +18,7 @@ async def main():
 
     print("🤖 Bot started")
 
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await bot.session.close()
-
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
