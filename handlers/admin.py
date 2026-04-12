@@ -6,6 +6,7 @@ from database.db import get_tickets, get_stats
 router = Router()
 
 
+# ---------------- STATS ----------------
 @router.message(F.text == "📊 Статистика")
 async def stats(message: Message):
 
@@ -22,25 +23,24 @@ async def stats(message: Message):
         text += "— нет данных"
     else:
         for item in by_cat:
-            category = item[0]
-            count = item[1]
-            text += f"• {category}: {count}\n"
+            text += f"• {item[0]}: {item[1]}\n"
 
     await message.answer(text)
 
 
+# ---------------- TICKETS ----------------
 @router.message(F.text == "📩 Тикеты")
 async def tickets(message: Message):
 
-    tickets = get_tickets()
+    data = get_tickets()
 
-    if not tickets:
+    if not data:
         await message.answer("📭 Тикетов нет")
         return
 
-    text = "📩 <b>Последние тикеты:</b>\n\n"
+    text = "📩 <b>Последние тикеты</b>\n\n"
 
-    for t in tickets[:10]:
+    for t in data[:10]:
         text += (
             f"🆔 {t[0]}\n"
             f"👤 {t[1]}\n"
