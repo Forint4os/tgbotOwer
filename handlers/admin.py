@@ -1,52 +1,67 @@
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 
-from database.db import get_tickets, get_stats
+from config import OWNER_ID
+from database.db import get_tickets
 
 router = Router()
 
+class AdminStates(StatesGroup):
+    password = State()
 
-# ---------------- STATS ----------------
-@router.message(F.text == "📊 Статистика")
-async def stats(message: Message):
+def admin_kb():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📊 Статистика")],
+            [KeyboardButton(text="📩 Тикеты")],
+            [KeyboardButton(text="⬅️ Выход")]
+        ],
+        resize_keyboard=True
+    )
 
-    data = get_stats()
+# ================= ВХОД =================
+@router.message(F.text == "/admin")
+async def admin_login(message: Message, state: FSMContext):
+    await state.set_state(AdminStates.password)
+    await message.answer("🔐 Введите пароль:")
 
-    total = data["total"]
-    by_cat = data["by_category"]
-
-    text = "📊 <b>Статистика</b>\n\n"
-    text += f"Всего тикетов: <b>{total}</b>\n\n"
-    text += "По категориям:\n"
-
-    if not by_cat:
-        text += "— нет данных"
+@router.message(AdminStates.password)
+async def check_password(message: Message, state: FSMContext):
+    if message.text == "123":
+        await message.answer(
+            "✅ Доступ разрешён",
+            reply_markup=admin_kb()
+        )
+        await state.clear()
     else:
-        for item in by_cat:
-            text += f"• {item[0]}: {item[1]}\n"
+        await message.answer("❌ Неверный пароль")
 
-    await message.answer(text)
-
-
-# ---------------- TICKETS ----------------
+# ================= ТИКЕТЫ =================
 @router.message(F.text == "📩 Тикеты")
 async def tickets(message: Message):
-
-    data = get_tickets()
-
-    if not data:
-        await message.answer("📭 Тикетов нет")
+    if message.from_user.id != OWNER_ID:
         return
 
-    text = "📩 <b>Последние тикеты</b>\n\n"
+    tickets = get_tickets()
 
-    for t in data[:10]:
-        text += (
-            f"🆔 {t[0]}\n"
-            f"👤 {t[1]}\n"
-            f"📂 {t[3]}\n"
-            f"💬 {t[4]}\n"
-            f"────────────\n"
-        )
+    if not tickets:
+        await message.answer("📭 Нет тикетов")
+        return
+
+    text = "📩 Список сообщений:\n\n"
+
+    for t in tickets:
+        text += f"ID: {t[0]} | {t[2]}\n"
 
     await message.answer(text)
+
+# ================= СТАТИСТИКА =================
+@router.message(F.text == "📊 Статистика")
+async def stats(message: Message):
+    await message.answer(
+        "📊 Статистика:\n\n"
+        "Пока простая версия\n"
+        "Позже подключим AI анализ"
+    )
