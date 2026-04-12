@@ -1,24 +1,21 @@
 import sqlite3
 import time
 
-DB = "bot.db"
+DB_NAME = "bot.db"
 
 
-def connect():
-    return sqlite3.connect(DB)
-
-
+# ---------------- INIT DB ----------------
 def init_db():
-    conn = connect()
+    conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS tickets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        admin_id INTEGER,
-        category TEXT,
-        text TEXT,
+        user_id INTEGER NOT NULL,
+        admin_id INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        message TEXT NOT NULL,
         status INTEGER DEFAULT 0,
         created_at INTEGER
     )
@@ -29,56 +26,82 @@ def init_db():
 
 
 # ---------------- CREATE TICKET ----------------
-def create_ticket(user_id, admin_id, category, text):
-
-    conn = connect()
+def create_ticket(user_id: int, admin_id: int, category: str, message: str):
+    conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO tickets (user_id, admin_id, category, text, status, created_at)
+        INSERT INTO tickets (user_id, admin_id, category, message, status, created_at)
         VALUES (?, ?, ?, ?, 0, ?)
-    """, (user_id, admin_id, category, text, int(time.time())))
+    """, (user_id, admin_id, category, message, int(time.time())))
 
     conn.commit()
-    ticket_id = cur.lastrowid
-    conn.close()
 
+    ticket_id = cur.lastrowid
+
+    conn.close()
     return ticket_id
 
 
-# ---------------- GET TICKETS ----------------
-def get_tickets():
-
-    conn = connect()
+# ---------------- GET ALL TICKETS ----------------
+def get_all_tickets():
+    conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM tickets ORDER BY id DESC")
-    rows = cur.fetchall()
+    cur.execute("""
+        SELECT id, user_id, admin_id, category, message, status, created_at
+        FROM tickets
+        ORDER BY id DESC
+    """)
 
+    rows = cur.fetchall()
     conn.close()
     return rows
 
 
-# ---------------- GET ONE ----------------
-def get_ticket(ticket_id):
-
-    conn = connect()
+# ---------------- GET TICKETS BY ADMIN ----------------
+def get_tickets_by_admin(admin_id: int):
+    conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM tickets WHERE id=?", (ticket_id,))
-    row = cur.fetchone()
+    cur.execute("""
+        SELECT id, user_id, category, message, status
+        FROM tickets
+        WHERE admin_id = ?
+        ORDER BY id DESC
+    """, (admin_id,))
 
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+# ---------------- GET SINGLE TICKET ----------------
+def get_ticket(ticket_id: int):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, user_id, admin_id, category, message, status, created_at
+        FROM tickets
+        WHERE id = ?
+    """, (ticket_id,))
+
+    row = cur.fetchone()
     conn.close()
     return row
 
 
-# ---------------- CLOSE / ANSWER ----------------
-def mark_answered(ticket_id):
-
-    conn = connect()
+# ---------------- MARK AS ANSWERED ----------------
+def mark_answered(ticket_id: int):
+    conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
-    cur.execute("UPDATE tickets SET status=1 WHERE id=?", (ticket_id,))
+    cur.execute("""
+        UPDATE tickets
+        SET status = 1
+        WHERE id = ?
+    """, (ticket_id,))
 
     conn.commit()
     conn.close()
@@ -86,8 +109,7 @@ def mark_answered(ticket_id):
 
 # ---------------- STATS ----------------
 def get_stats():
-
-    conn = connect()
+    conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM tickets")
@@ -99,7 +121,11 @@ def get_stats():
         GROUP BY category
     """)
 
-    by_cat = cur.fetchall()
+    by_category = cur.fetchall()
 
     conn.close()
-    return total, by_cat
+
+    return {
+        "total": total,
+        "by_category": by_category
+    }
