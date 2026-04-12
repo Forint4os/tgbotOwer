@@ -34,9 +34,9 @@ def create_ticket(user_id, admin_id, category, message):
     """, (user_id, admin_id, category, message, int(time.time())))
 
     conn.commit()
-    ticket_id = cur.lastrowid
+    tid = cur.lastrowid
     conn.close()
-    return ticket_id
+    return tid
 
 
 def get_tickets():
@@ -49,9 +49,9 @@ def get_tickets():
         ORDER BY id DESC
     """)
 
-    data = cur.fetchall()
+    rows = cur.fetchall()
     conn.close()
-    return data
+    return rows
 
 
 def get_stats():
