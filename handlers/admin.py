@@ -26,7 +26,7 @@ async def admin_login(message: Message, state: FSMContext):
 
 @router.message(AdminStates.password)
 async def check_pass(message: Message, state: FSMContext):
-    if message.text == "123":
+    if message.text == "ower":
         await message.answer("✅ Доступ получен", reply_markup=admin_kb())
         await state.clear()
     else:
