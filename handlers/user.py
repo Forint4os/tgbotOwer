@@ -1,150 +1,136 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 
-from config import OWNER_ID
+from keyboards.inline import main_menu, categories, recipients
+from states.user_states import UserStates
 from database.db import create_ticket
+from config import ADMIN_ID
 
 router = Router()
 
-# ================= FSM =================
-class UserStates(StatesGroup):
-    choosing_category = State()
-    choosing_admin = State()
-    writing_message = State()
 
-# ================= КНОПКИ =================
-def main_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✍️ Написать", callback_data="write"),
-            InlineKeyboardButton(text="ℹ️ Помощь", callback_data="help")
-        ],
-        [
-            InlineKeyboardButton(text="💼 Работа", callback_data="cat_Работа"),
-            InlineKeyboardButton(text="💡 Предложения", callback_data="cat_Предложения")
-        ],
-        [
-            InlineKeyboardButton(text="💰 Зарплата", callback_data="cat_Зарплата"),
-            InlineKeyboardButton(text="🤝 Коллаборация", callback_data="cat_Коллаборация")
-        ],
-        [
-            InlineKeyboardButton(text="⚠️ Ошибки", callback_data="cat_Ошибки"),
-            InlineKeyboardButton(text="🛠 Поддержка", callback_data="cat_Поддержка")
-        ],
-        [
-            InlineKeyboardButton(text="👤 Личное", callback_data="cat_Личное"),
-            InlineKeyboardButton(text="📌 Другое", callback_data="cat_Другое")
-        ]
-    ])
-
-def admin_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👑 Главный админ", callback_data="admin_main")],
-        [InlineKeyboardButton(text="👑 Админ 2", callback_data="admin_second")],
-        [
-            InlineKeyboardButton(text="➖ Пусто", callback_data="empty"),
-            InlineKeyboardButton(text="➖ Пусто", callback_data="empty")
-        ],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back")]
-    ])
-
-# ================= START =================
-@router.message(F.text.in_(["/start", "старт"]))
+@router.message(F.text == "/start")
 async def start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "👋 Привет!\n\n"
-        "Я бот-помощник OWER.\n\n"
-        "📩 Здесь ты можешь отправить сообщение админу.\n"
-        "⚠️ Не спамь.\n\n"
-        "👇 Выбери действие:",
-        reply_markup=main_kb()
+        "👋 Привет! Я бот-помощник OWER.\n\n"
+        "Здесь ты можешь:\n"
+        "— задать вопрос\n"
+        "— отправить предложение\n"
+        "— написать администрации\n\n"
+        "Пожалуйста, не спамь.",
+        reply_markup=main_menu()
     )
 
-# ================= HELP =================
+
+@router.callback_query(F.data == "write")
+async def write(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "📂 Выберите категорию:",
+        reply_markup=categories()
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data == "help")
-async def help_handler(callback: CallbackQuery):
+async def help_section(callback: CallbackQuery):
     await callback.message.edit_text(
-        "📖 Помощь:\n\n"
-        "1. Выбери категорию\n"
-        "2. Выбери админа\n"
-        "3. Напиши сообщение\n\n"
-        "📬 Ответ придёт сюда.",
-        reply_markup=main_kb()
+        "ℹ️ Помощь\n\n"
+        "Этот бот позволяет анонимно связаться с администрацией.\n\n"
+        "Нажмите «Написать», выберите тему и получателя — и отправьте сообщение.",
+        reply_markup=main_menu()
     )
+    await callback.answer()
 
-# ================= КАТЕГОРИИ =================
+
+@router.callback_query(F.data == "tips")
+async def tips_section(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "💡 Советы\n\n"
+        "— Пишите конкретно и по делу\n"
+        "— Укажите суть проблемы\n"
+        "— Одно обращение = одна тема",
+        reply_markup=main_menu()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back")
+async def go_back(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text(
+        "👋 Главное меню:",
+        reply_markup=main_menu()
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("cat_"))
-async def category(callback: CallbackQuery, state: FSMContext):
-    cat = callback.data.split("_")[1]
+async def choose_category(callback: CallbackQuery, state: FSMContext):
+    category_map = {
+        "salary": "💰 Зарплата",
+        "complaint": "⚠️ Жалоба",
+        "suggest": "💡 Предложение",
+        "other": "📌 Другое"
+    }
+    key = callback.data.split("_")[1]
+    category = category_map.get(key, key)
 
-    await state.update_data(category=cat)
+    await state.update_data(category=category)
 
     await callback.message.edit_text(
-        f"📂 Категория: {cat}\n\n"
-        "👤 Выберите администратора:",
-        reply_markup=admin_kb()
+        f"Категория: {category}\n\n👤 Выберите получателя:",
+        reply_markup=recipients()
     )
+    await callback.answer()
 
-    await state.set_state(UserStates.choosing_admin)
 
-# ================= ВЫБОР АДМИНА =================
-@router.callback_query(UserStates.choosing_admin)
+@router.callback_query(F.data == "admin_1")
 async def choose_admin(callback: CallbackQuery, state: FSMContext):
-
-    if callback.data == "back":
-        await state.clear()
-        await callback.message.edit_text(
-            "🔙 Возврат в меню",
-            reply_markup=main_kb()
-        )
-        return
-
-    if callback.data == "empty":
-        await callback.answer("❌ Пока не доступно", show_alert=True)
-        return
-
-    admin_id = OWNER_ID
-
-    await state.update_data(admin_id=admin_id)
+    await state.set_state(UserStates.waiting_message)
+    await state.update_data(msg_id=callback.message.message_id)
 
     await callback.message.edit_text(
-        "✍️ Напишите сообщение одним текстом.\n\n"
-        "📩 Оно будет отправлено админу."
+        "✏️ Напишите ваше сообщение одним текстом.\n\n"
+        "Для отмены — /start"
     )
+    await callback.answer()
 
-    await state.set_state(UserStates.writing_message)
 
-# ================= ОТПРАВКА =================
-@router.message(UserStates.writing_message)
+@router.callback_query(F.data == "none")
+async def not_available(callback: CallbackQuery):
+    await callback.answer("Этот получатель пока недоступен", show_alert=True)
+
+
+@router.message(UserStates.waiting_message)
 async def send_ticket(message: Message, state: FSMContext):
     data = await state.get_data()
+    category = data.get("category", "Другое")
 
-    create_ticket(
+    ticket_id = create_ticket(
         user_id=message.from_user.id,
-        category=data["category"],
-        text=message.text
+        category=category,
+        message=message.text
     )
 
-    # отправка админу
-    try:
-        await message.bot.send_message(
-            data["admin_id"],
-            f"📩 Новое сообщение\n\n"
-            f"👤 {message.from_user.id}\n"
-            f"📂 {data['category']}\n\n"
-            f"{message.text}"
-        )
-    except:
-        pass
-
     await message.answer(
-        "✅ Сообщение отправлено!\n\n"
-        "📬 Ждите ответ.",
-        reply_markup=main_kb()
+        f"✅ Сообщение отправлено!\n\n"
+        f"Номер обращения: #{ticket_id}\n"
+        f"Категория: {category}\n\n"
+        "Ответ придёт в этот чат.",
+        reply_markup=main_menu()
+    )
+
+    username = f"@{message.from_user.username}" if message.from_user.username else f"id:{message.from_user.id}"
+
+    await message.bot.send_message(
+        ADMIN_ID,
+        f"📩 Новый тикет #{ticket_id}\n\n"
+        f"👤 Пользователь: {username}\n"
+        f"📂 Категория: {category}\n\n"
+        f"💬 Сообщение:\n{message.text}\n\n"
+        f"Чтобы ответить: /reply {ticket_id}"
     )
 
     await state.clear()
